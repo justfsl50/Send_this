@@ -39,6 +39,26 @@ export function createPeerConnection(
         { urls: "stun:stun1.l.google.com:19302" },
         { urls: "stun:stun2.l.google.com:19302" },
         { urls: "stun:stun3.l.google.com:19302" },
+        {
+          urls: "turn:a.relay.metered.ca:80",
+          username: "e54c0ae69655f0fa8b1b882d",
+          credential: "3bJMSJvfxUrmJpTi",
+        },
+        {
+          urls: "turn:a.relay.metered.ca:80?transport=tcp",
+          username: "e54c0ae69655f0fa8b1b882d",
+          credential: "3bJMSJvfxUrmJpTi",
+        },
+        {
+          urls: "turn:a.relay.metered.ca:443",
+          username: "e54c0ae69655f0fa8b1b882d",
+          credential: "3bJMSJvfxUrmJpTi",
+        },
+        {
+          urls: "turns:a.relay.metered.ca:443?transport=tcp",
+          username: "e54c0ae69655f0fa8b1b882d",
+          credential: "3bJMSJvfxUrmJpTi",
+        },
       ],
     },
   });
