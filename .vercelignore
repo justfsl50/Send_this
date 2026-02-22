@@ -1,0 +1,6 @@
+server/
+node_modules/
+.orchids/
+AGENTS.md
+BACKEND.md
+debug.log
