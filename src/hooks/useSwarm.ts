@@ -30,6 +30,7 @@ export function useSwarm(roomCode: string, isHost: boolean) {
   const myPeerIdRef = useRef("");
   const myDisplayNameRef = useRef(isHost ? "Host" : "");
   const connectedPeersRef = useRef<Set<string>>(new Set());
+  const retryCountRef = useRef<Map<string, number>>(new Map());
 
   // Host-side: all shared files (fileId -> File object)
   const sharedFilesRef = useRef<Map<string, File>>(new Map());
@@ -279,6 +280,7 @@ export function useSwarm(roomCode: string, isHost: boolean) {
     onConnect: (peerId: string) => {
       console.log(`[Swarm] peer connected: ${peerId}`);
       connectedPeersRef.current.add(peerId);
+      retryCountRef.current.delete(peerId);
       useSwarmStore.getState().updatePeerStatus(peerId, "active");
 
       webrtc.sendMessage(peerId, {
@@ -294,7 +296,21 @@ export function useSwarm(roomCode: string, isHost: boolean) {
     },
     onError: (peerId: string, error: Error) => {
       console.error(`[Swarm] peer error: ${peerId}`, error.message);
+      connectedPeersRef.current.delete(peerId);
       useSwarmStore.getState().updatePeerStatus(peerId, "disconnected");
+
+      // Auto-retry connection (up to 3 attempts)
+      const retryCount = retryCountRef.current.get(peerId) || 0;
+      if (retryCount < 3) {
+        retryCountRef.current.set(peerId, retryCount + 1);
+        const delay = 1000 * (retryCount + 1); // 1s, 2s, 3s
+        console.log(`[Swarm] retrying peer ${peerId} in ${delay}ms (attempt ${retryCount + 1}/3)`);
+        setTimeout(() => {
+          if (!connectedPeersRef.current.has(peerId)) {
+            webrtc.createConnection(peerId, true);
+          }
+        }, delay);
+      }
     },
     onSignal: (peerId: string, signalData: Peer.SignalData) => {
       signalingClient.sendSignal(
