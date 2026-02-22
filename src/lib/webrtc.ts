@@ -6,6 +6,43 @@ export interface PeerConnection {
   connected: boolean;
 }
 
+const METERED_API_KEY = "R-UtuAPdfql3-76vtsuVBy2LqvPgWh8WAjkN0v9CutLxi9fA";
+
+const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+];
+
+let cachedIceServers: RTCIceServer[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
+
+/**
+ * Fetch TURN credentials from Metered API.
+ * Credentials are temporary and auto-rotate.
+ * Falls back to STUN-only if fetch fails.
+ */
+export async function getIceServers(): Promise<RTCIceServer[]> {
+  if (cachedIceServers && Date.now() - cacheTimestamp < CACHE_TTL) {
+    return cachedIceServers;
+  }
+
+  try {
+    const resp = await fetch(
+      `https://droplink.metered.live/api/v1/turn/credentials?apiKey=${METERED_API_KEY}`
+    );
+    if (!resp.ok) throw new Error(`Metered API error: ${resp.status}`);
+    const servers: RTCIceServer[] = await resp.json();
+    cachedIceServers = [...FALLBACK_ICE_SERVERS, ...servers];
+    cacheTimestamp = Date.now();
+    console.log(`[WebRTC] Fetched ${servers.length} TURN servers from Metered`);
+    return cachedIceServers;
+  } catch (err) {
+    console.warn("[WebRTC] Failed to fetch TURN credentials, using STUN only:", err);
+    return FALLBACK_ICE_SERVERS;
+  }
+}
+
 /**
  * Create a WebRTC peer connection using simple-peer.
  * 
@@ -22,7 +59,8 @@ export function createPeerConnection(
   onData: (data: Uint8Array) => void,
   onConnect: () => void,
   onClose: () => void,
-  onError: (err: Error) => void
+  onError: (err: Error) => void,
+  iceServers?: RTCIceServer[]
 ): PeerConnection {
   console.log(`[WebRTC] createPeerConnection peer=${peerId} initiator=${initiator}`);
 
@@ -31,35 +69,9 @@ export function createPeerConnection(
     trickle: true,
     channelConfig: {
       ordered: true,
-      // No maxRetransmits — channel is RELIABLE
     },
     config: {
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun3.l.google.com:19302" },
-        {
-          urls: "turn:a.relay.metered.ca:80",
-          username: "e54c0ae69655f0fa8b1b882d",
-          credential: "3bJMSJvfxUrmJpTi",
-        },
-        {
-          urls: "turn:a.relay.metered.ca:80?transport=tcp",
-          username: "e54c0ae69655f0fa8b1b882d",
-          credential: "3bJMSJvfxUrmJpTi",
-        },
-        {
-          urls: "turn:a.relay.metered.ca:443",
-          username: "e54c0ae69655f0fa8b1b882d",
-          credential: "3bJMSJvfxUrmJpTi",
-        },
-        {
-          urls: "turns:a.relay.metered.ca:443?transport=tcp",
-          username: "e54c0ae69655f0fa8b1b882d",
-          credential: "3bJMSJvfxUrmJpTi",
-        },
-      ],
+      iceServers: iceServers || FALLBACK_ICE_SERVERS,
     },
   });
 

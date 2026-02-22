@@ -3,6 +3,7 @@
 import { useCallback, useRef } from "react";
 import {
   createPeerConnection,
+  getIceServers,
   signalPeer,
   destroyPeer,
   sendJSON,
@@ -27,12 +28,15 @@ export function useWebRTC(options: UseWebRTCOptions) {
   optionsRef.current = options;
 
   const createConnection = useCallback(
-    (peerId: string, initiator: boolean) => {
+    async (peerId: string, initiator: boolean) => {
       // Destroy existing connection if any
       if (connectionsRef.current.has(peerId)) {
         destroyPeer(connectionsRef.current.get(peerId)!);
         connectionsRef.current.delete(peerId);
       }
+
+      // Fetch fresh TURN credentials
+      const iceServers = await getIceServers();
 
       const connection = createPeerConnection(
         initiator,
@@ -66,7 +70,8 @@ export function useWebRTC(options: UseWebRTCOptions) {
           optionsRef.current.onClose(peerId);
         },
         // onError
-        (err) => optionsRef.current.onError(peerId, err)
+        (err) => optionsRef.current.onError(peerId, err),
+        iceServers
       );
 
       connectionsRef.current.set(peerId, connection);
