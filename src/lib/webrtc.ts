@@ -6,42 +6,30 @@ export interface PeerConnection {
   connected: boolean;
 }
 
-const METERED_API_KEY = "R-UtuAPdfql3-76vtsuVBy2LqvPgWh8WAjkN0v9CutLxi9fA";
-
-const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
+const ICE_SERVERS: RTCIceServer[] = [
+  { urls: "stun:stun.relay.metered.ca:80" },
   { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
+  {
+    urls: "turn:global.relay.metered.ca:80",
+    username: "2f261de2206b3b5a667a143c",
+    credential: "ioc4UwMcqjma+grF",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:80?transport=tcp",
+    username: "2f261de2206b3b5a667a143c",
+    credential: "ioc4UwMcqjma+grF",
+  },
+  {
+    urls: "turn:global.relay.metered.ca:443",
+    username: "2f261de2206b3b5a667a143c",
+    credential: "ioc4UwMcqjma+grF",
+  },
+  {
+    urls: "turns:global.relay.metered.ca:443?transport=tcp",
+    username: "2f261de2206b3b5a667a143c",
+    credential: "ioc4UwMcqjma+grF",
+  },
 ];
-
-let cachedIceServers: RTCIceServer[] | null = null;
-let cacheTimestamp = 0;
-const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
-
-/**
- * Fetch TURN credentials from Metered API.
- * Credentials are temporary and auto-rotate.
- * Falls back to STUN-only if fetch fails.
- */
-export async function getIceServers(): Promise<RTCIceServer[]> {
-  if (cachedIceServers && Date.now() - cacheTimestamp < CACHE_TTL) {
-    return cachedIceServers;
-  }
-
-  try {
-    const resp = await fetch(
-      `https://droplink.metered.live/api/v1/turn/credentials?apiKey=${METERED_API_KEY}`
-    );
-    if (!resp.ok) throw new Error(`Metered API error: ${resp.status}`);
-    const servers: RTCIceServer[] = await resp.json();
-    cachedIceServers = [...FALLBACK_ICE_SERVERS, ...servers];
-    cacheTimestamp = Date.now();
-    console.log(`[WebRTC] Fetched ${servers.length} TURN servers from Metered`);
-    return cachedIceServers;
-  } catch (err) {
-    console.warn("[WebRTC] Failed to fetch TURN credentials, using STUN only:", err);
-    return FALLBACK_ICE_SERVERS;
-  }
-}
 
 /**
  * Create a WebRTC peer connection using simple-peer.
@@ -71,7 +59,7 @@ export function createPeerConnection(
       ordered: true,
     },
     config: {
-      iceServers: iceServers || FALLBACK_ICE_SERVERS,
+      iceServers: iceServers || ICE_SERVERS,
     },
   });
 
